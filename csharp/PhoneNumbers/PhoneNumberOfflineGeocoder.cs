@@ -1,4 +1,5 @@
-﻿/*
+﻿#nullable disable
+/*
  * Copyright (C) 2011 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +26,6 @@ using System.Text.RegularExpressions;
 
 namespace PhoneNumbers
 {
-
     public class Locale
     {
         public static readonly Locale English = new Locale("en", "GB");
@@ -46,24 +46,26 @@ namespace PhoneNumbers
 
         public string GetDisplayCountry(string language)
         {
-            if(string.IsNullOrEmpty(Country))
+            if (string.IsNullOrEmpty(Country))
                 return "";
             var name = GetCountryName(Country, language);
-            if(name != null)
+            if (name != null)
                 return name;
             var lang = CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-            if(lang != language)
+            if (lang != language)
             {
                 name = GetCountryName(Country, lang);
-                if(name != null)
+                if (name != null)
                     return name;
             }
-            if(language != "en" && lang != "en")
+
+            if (language != "en" && lang != "en")
             {
                 name = GetCountryName(Country, "en");
-                if(name != null)
+                if (name != null)
                     return name;
             }
+
             name = GetCountryName(Country, Language);
             return name ?? "";
         }
@@ -78,6 +80,7 @@ namespace PhoneNumbers
             return name;
         }
     }
+
     /**
      * An offline geocoder which provides geographical information related to a phone number.
      *
@@ -100,7 +103,8 @@ namespace PhoneNumbers
 
         // A mapping from countryCallingCode_lang to the corresponding phone prefix map that has been
         // loaded.
-        private readonly Dictionary<string, AreaCodeMap> availablePhonePrefixMaps = new Dictionary<string, AreaCodeMap>();
+        private readonly Dictionary<string, AreaCodeMap> availablePhonePrefixMaps =
+            new Dictionary<string, AreaCodeMap>();
 
         internal PhoneNumberOfflineGeocoder(string phonePrefixDataDirectory, Assembly asm = null)
         {
@@ -118,6 +122,7 @@ namespace PhoneNumbers
                 {
                     files = LoadFileNamesFromZip(zipStream);
                 }
+
                 phoneDataZipFile = zipFile;
             }
             else
@@ -144,6 +149,11 @@ namespace PhoneNumbers
                 }
 
                 var name = entry.FullName.Split('.')[0].Split('\\');
+                // fallback to directory separator char if we are unable to use the original implementation of splitting the path
+                if (name.Length < 2)
+                {
+                    name = entry.FullName.Split('.')[0].Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                }
                 int country;
                 try
                 {
@@ -153,6 +163,7 @@ namespace PhoneNumbers
                 {
                     throw new Exception("Failed to parse zipped geocoding file name: " + entry.FullName);
                 }
+
                 var language = name[0];
                 if (!files.TryGetValue(country, out var languages))
                     files[country] = languages = new HashSet<string>();
@@ -162,7 +173,8 @@ namespace PhoneNumbers
             return files;
         }
 
-        private static SortedDictionary<int, HashSet<string>> LoadFileNamesFromManifestResources(Assembly asm, string prefix)
+        private static SortedDictionary<int, HashSet<string>> LoadFileNamesFromManifestResources(Assembly asm,
+            string prefix)
         {
             var files = new SortedDictionary<int, HashSet<string>>();
 
@@ -176,10 +188,11 @@ namespace PhoneNumbers
                 {
                     country = int.Parse(name[1], CultureInfo.InvariantCulture);
                 }
-                catch(FormatException)
+                catch (FormatException)
                 {
                     throw new Exception("Failed to parse geocoding file name: " + name);
                 }
+
                 var language = name[0];
                 if (!files.TryGetValue(country, out var languages))
                     files[country] = languages = new HashSet<string>();
@@ -197,6 +210,7 @@ namespace PhoneNumbers
             {
                 return null;
             }
+
             lock (availablePhonePrefixMaps)
             {
                 if (!availablePhonePrefixMaps.TryGetValue(fileName, out var map))
@@ -299,7 +313,8 @@ namespace PhoneNumbers
         {
             return regionCode == null || regionCode.Equals("ZZ") ||
                    regionCode.Equals(PhoneNumberUtil.REGION_CODE_FOR_NON_GEO_ENTITY)
-                ? "" : new Locale("", regionCode).GetDisplayCountry(language.Language);
+                ? ""
+                : new Locale("", regionCode).GetDisplayCountry(language.Language);
         }
 
         /**
@@ -317,13 +332,14 @@ namespace PhoneNumbers
         public string GetDescriptionForValidNumber(PhoneNumber number, Locale languageCode)
         {
             var langStr = languageCode.Language;
-            var scriptStr = "";  // No script is specified
+            var scriptStr = ""; // No script is specified
             var regionStr = languageCode.Country;
 
             var areaDescription =
                 GetAreaDescriptionForNumber(number, langStr, scriptStr, regionStr);
             return (areaDescription.Length > 0)
-                ? areaDescription : GetCountryNameForNumber(number, languageCode);
+                ? areaDescription
+                : GetCountryNameForNumber(number, languageCode);
         }
 
         /**
@@ -358,6 +374,7 @@ namespace PhoneNumbers
             {
                 return GetDescriptionForValidNumber(number, languageCode);
             }
+
             // Otherwise, we just show the region(country) name for now.
             return GetRegionDisplayName(regionCode, languageCode);
             // TODO: Concatenate the lower-level and country-name information in an appropriate
@@ -419,8 +436,10 @@ namespace PhoneNumbers
                 {
                     return "";
                 }
+
                 description = defaultMap.Lookup(number);
             }
+
             return description ?? "";
         }
 
@@ -432,6 +451,5 @@ namespace PhoneNumbers
             // - Korean
             return !lang.Equals("zh") && !lang.Equals("ja") && !lang.Equals("ko");
         }
-
     }
 }

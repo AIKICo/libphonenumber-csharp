@@ -143,6 +143,42 @@ namespace PhoneNumbers.Test
         }
 
         [Fact]
+        public void TestGetInstanceLoadBadMetadata()
+        {
+            Assert.Null(phoneUtil.GetMetadataForRegion("No Such Region"));
+            Assert.Null(phoneUtil.GetMetadataForNonGeographicalRegion(-1));
+        }
+
+        [Fact]
+        public void TestGetSupportedTypesForRegion()
+        {
+            Assert.Contains(PhoneNumberType.FIXED_LINE, phoneUtil.GetSupportedTypesForRegion(RegionCode.BR));
+            // Our test data has no mobile numbers for Brazil.
+            Assert.DoesNotContain(PhoneNumberType.MOBILE, phoneUtil.GetSupportedTypesForRegion(RegionCode.BR));
+            // UNKNOWN should never be returned.
+            Assert.DoesNotContain(PhoneNumberType.UNKNOWN, phoneUtil.GetSupportedTypesForRegion(RegionCode.BR));
+            // In the US, many numbers are classified as FIXED_LINE_OR_MOBILE; but we don't want to expose
+            // this as a supported type, instead we say FIXED_LINE and MOBILE are both present.
+            Assert.Contains(PhoneNumberType.FIXED_LINE, phoneUtil.GetSupportedTypesForRegion(RegionCode.US));
+            Assert.Contains(PhoneNumberType.MOBILE, phoneUtil.GetSupportedTypesForRegion(RegionCode.US));
+            Assert.DoesNotContain(PhoneNumberType.FIXED_LINE_OR_MOBILE, phoneUtil.GetSupportedTypesForRegion(RegionCode.US));
+            // Test the invalid region code.
+            Assert.Empty(phoneUtil.GetSupportedTypesForRegion(RegionCode.ZZ));
+        }
+
+        [Fact]
+        public void TestGetSupportedTypesForNonGeoEntity()
+        {
+            // No data exists for 999 at all, no types should be returned.
+            Assert.Empty(phoneUtil.GetSupportedTypesForNonGeoEntity(999));
+
+            var typesFor979 = phoneUtil.GetSupportedTypesForNonGeoEntity(979);
+            Assert.Contains(PhoneNumberType.PREMIUM_RATE, typesFor979);
+            Assert.DoesNotContain(PhoneNumberType.MOBILE, typesFor979);
+            Assert.DoesNotContain(PhoneNumberType.UNKNOWN, typesFor979);
+        }
+
+        [Fact]
         public void TestGetInstanceLoadUSMetadata()
         {
             var metadata = phoneUtil.GetMetadataForRegion(RegionCode.US);
@@ -225,6 +261,18 @@ namespace PhoneNumbers.Test
         }
 
         [Fact]
+        public void TestIsNumberGeographical()
+        {
+            Assert.False(phoneUtil.IsNumberGeographical(BSMobile)); // Bahamas, mobile phone number.
+            Assert.True(phoneUtil.IsNumberGeographical(AUNumber)); // Australian fixed line number.
+            Assert.False(phoneUtil.IsNumberGeographical(InternationalTollFree)); // International toll free number.
+            // We test that mobile phone numbers in relevant regions are indeed considered geographical.
+            Assert.True(phoneUtil.IsNumberGeographical(ARMobile)); // Argentina, mobile phone number.
+            Assert.True(phoneUtil.IsNumberGeographical(MXMobile1)); // Mexico, mobile phone number.
+            Assert.True(phoneUtil.IsNumberGeographical(MXMobile2)); // Mexico, another mobile phone number.
+        }
+
+        [Fact]
         public void TestGetLengthOfGeographicalAreaCode()
         {
             // Google MTV, which has area code "650".
@@ -247,6 +295,9 @@ namespace PhoneNumbers.Test
 
             // Italian numbers - there is no national prefix, but it still has an area code.
             Assert.Equal(2, phoneUtil.GetLengthOfGeographicalAreaCode(ITNumber));
+
+            // Mexico numbers - there is no national prefix, but it still has an area code.
+            Assert.Equal(2, phoneUtil.GetLengthOfGeographicalAreaCode(MXNumber1));
 
             // Google Singapore. Singapore has no area code and no national prefix.
             Assert.Equal(0, phoneUtil.GetLengthOfGeographicalAreaCode(SGNumber));
@@ -369,6 +420,17 @@ namespace PhoneNumbers.Test
             Assert.Equal(expectedOutput, PhoneNumberUtil.ConvertAlphaCharactersInNumber(input));
         }
 
+        [Fact]
+        public void TestConvertAlphaCharactersInNumberHandlesNull()
+        {
+            Assert.Equal(string.Empty, PhoneNumberUtil.ConvertAlphaCharactersInNumber(null));
+        }
+
+        [Fact]
+        public void TestNormaliseNull()
+        {
+            Assert.Equal(string.Empty, PhoneNumberUtil.Normalize(null));
+        }
 
         [Fact]
         public void TestNormaliseRemovePunctuation()
@@ -409,6 +471,26 @@ namespace PhoneNumbers.Test
             var expectedOutput = "03456234";
             Assert.Equal(expectedOutput,
                 PhoneNumberUtil.NormalizeDigitsOnly(inputNumber));
+        }
+
+        [Fact]
+        public void TestNormalizeDigitsOnlyHandlesNull()
+        {
+            Assert.Equal(string.Empty, PhoneNumberUtil.NormalizeDigitsOnly(null));
+        }
+
+        [Fact]
+        public void TestNormaliseStripNonDiallableCharacters()
+        {
+            const string inputNumber = "03*4-56&+1a#234";
+            const string expectedOutput = "03*456+1#234";
+            Assert.Equal(expectedOutput, PhoneNumberUtil.NormalizeDiallableCharsOnly(inputNumber));
+        }
+
+        [Fact]
+        public void TestNormalizeDiallableCharsOnlyHandlesNull()
+        {
+            Assert.Equal(string.Empty, PhoneNumberUtil.NormalizeDiallableCharsOnly(null));
         }
 
         [Fact]
@@ -1968,7 +2050,11 @@ namespace PhoneNumbers.Test
             Assert.Equal(mxNumber, phoneUtil.Parse("045 33 1234-5678", RegionCode.MX));
         }
 
+#if NET6_0_OR_GREATER
+        private void VerifyFailure(string? number, string? regionCode, ErrorType type)
+#else
         private void VerifyFailure(string number, string regionCode, ErrorType type)
+#endif
         {
             try
             {

@@ -1,4 +1,5 @@
-﻿/*
+﻿#nullable disable
+/*
  * Copyright (C) 2009 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,6 +73,10 @@ namespace PhoneNumbers
         private static bool IsGeoMobileCountryWithoutMobileAreaCode(int countryCallingCode)
             => countryCallingCode is 86; // China
 
+        // Set of country codes that doesn't have national prefix, but it has area codes.
+        private static bool IsCountryWithoutNationalPrefixWithAreaCodes(int countryCallingCode)
+            => countryCallingCode is 52; // Mexico
+
         // Set of country calling codes that have geographically assigned mobile numbers. This may not be
         // complete; we add calling codes case by case, as we find geographical mobile numbers or hear
         // from user reports. Note that countries like the US, where we can't distinguish between
@@ -97,7 +102,7 @@ namespace PhoneNumbers
         // A map that contains characters that are essential when dialing. That means any of the
         // characters in this map must not be removed from a number when dialling, otherwise the call will
         // not reach the intended destination.
-        private static char MapDiallableChar(char c) => c is >= '0' and <= '9' or '+' or '*' ? c : '\0';
+        private static char MapDiallableChar(char c) => c is >= '0' and <= '9' or '+' or '*' or '#' ? c : '\0';
 
         // For performance reasons, amalgamate both into one map.
         private static char MapAlphaPhone(char c)
@@ -661,14 +666,18 @@ namespace PhoneNumbers
             var regionCode = GetRegionCodeForNumber(number);
             if (!IsValidRegionCode(regionCode))
                 return 0;
-            var metadata = GetMetadataForRegion(regionCode);
-            // If a country doesn't use a national prefix, and this number doesn't have an Italian leading
-            // zero, we assume it is a closed dialling plan with no area codes.
-            if (!metadata.HasNationalPrefix && !number.HasNumberOfLeadingZeros)
-                return 0;
 
             var type = GetNumberType(number);
             var countryCallingCode = number.CountryCode;
+            var metadata = GetMetadataForRegion(regionCode);
+            // If a country doesn't use a national prefix, and this number doesn't have an Italian leading
+            // zero, we assume it is a closed dialling plan with no area codes.
+            // Note:this is our general assumption, but there are exceptions which are tracked in
+            // COUNTRIES_WITHOUT_NATIONAL_PREFIX_WITH_AREA_CODES.
+            if (!metadata.HasNationalPrefix && !number.HasNumberOfLeadingZeros &&
+                    !IsCountryWithoutNationalPrefixWithAreaCodes(countryCallingCode))
+                return 0;
+
             if (type == PhoneNumberType.MOBILE
                 // Note this is a rough heuristic; it doesn't cover Indonesia well, for example, where area
                 // codes are present for some mobile phones but not for others. We have no better way of
